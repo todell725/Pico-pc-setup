@@ -3,13 +3,14 @@
 set -e
 
 ### GLOBALS
-SMB_MOUNT="/mnt/audiobooks"
-FTP_MOUNT="/mnt/seedbox"
+BASE_DIR="/opt/pico-data"
+MOUNT_DIR="$BASE_DIR/mounts"
+SMB_MOUNT="$MOUNT_DIR/audiobooks"
+FTP_MOUNT="$MOUNT_DIR/seedbox"
 SHARE_CREDENTIALS="/etc/smbcred-books"
 FTP_CREDENTIALS="/etc/ftpcred-seedbox"
 MOUNT_FILE="/etc/fstab"
-HOSTNAME="pico-pc"
-DASHY_DIR="$HOME/dashy"
+DASHY_DIR="$BASE_DIR/docker/dashy"
 
 ### MENU
 function main_menu() {
@@ -38,56 +39,43 @@ function main_menu() {
   esac
 }
 
-### MODULE 0: Add Repos & Keyrings + Base Tools
+### MODULE 0: Add Repos & Keyrings
 function add_repos() {
-  echo "[*] Checking sudo/root privileges..."
-  if [[ $EUID -ne 0 ]]; then
-    echo "[!] This script must be run with sudo privileges."
-    echo "    Re-running with sudo using default root password..."
-    echo "1991" | sudo -S true || { echo "Invalid sudo password or user not in sudoers group."; exit 1; }
-  fi
+  echo "[*] Ensuring required APT sources and tools..."
+  echo "1991" | sudo -S true || { echo "Sudo failed"; exit 1; }
 
-  echo "[*] Ensuring required base packages exist..."
   sudo apt update
-
   REQUIRED_PKGS=(lsb-release dpkg curl gpg software-properties-common apt-transport-https ca-certificates fuse)
 
   for pkg in "${REQUIRED_PKGS[@]}"; do
     if ! dpkg -s "$pkg" >/dev/null 2>&1; then
-      echo "[+] Installing missing package: $pkg"
       sudo apt install -y "$pkg"
-    else
-      echo "[✓] $pkg is already installed."
     fi
   done
 
-  echo "[*] Enabling 'universe' repo..."
   sudo add-apt-repository universe -y
 
-  echo "[*] Adding Docker repo..."
   sudo install -m 0755 -d /etc/apt/keyrings
   curl -fsSL https://download.docker.com/linux/debian/gpg | sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg
-  echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/debian $(lsb_release -cs) stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+  echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/debian $(lsb_release -cs) stable" | \
+  sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
 
-  echo "[*] Adding Tailscale repo..."
   curl -fsSL https://pkgs.tailscale.com/stable/ubuntu/jammy.noarmor.gpg | sudo gpg --dearmor -o /usr/share/keyrings/tailscale-archive-keyring.gpg
-  echo "deb [signed-by=/usr/share/keyrings/tailscale-archive-keyring.gpg] https://pkgs.tailscale.com/stable/ubuntu jammy main" | sudo tee /etc/apt/sources.list.d/tailscale.list
+  echo "deb [signed-by=/usr/share/keyrings/tailscale-archive-keyring.gpg] https://pkgs.tailscale.com/stable/ubuntu jammy main" | \
+  sudo tee /etc/apt/sources.list.d/tailscale.list
 
-  echo "[*] Updating package list again..."
   sudo apt update
-
-  echo "[✓] All required repos, tools, and keyrings installed."
+  echo "[✓] All repos and tools installed."
   sleep 2
 }
 
-### MODULE 1: XFCE + Customizations
+### MODULE 1: XFCE Setup
 function glow_up() {
-  echo "[*] Installing XFCE + themes + essentials..."
-  sudo apt update
+  echo "[*] Installing XFCE and essentials..."
   sudo apt install -y xfce4 lightdm arc-theme papirus-icon-theme fonts-ubuntu thunar firefox-esr plank picom xrdp
   sudo systemctl enable lightdm
-  mkdir -p ~/.config/autostart
 
+  mkdir -p ~/.config/autostart
   cat << EOF > ~/.config/autostart/picom.desktop
 [Desktop Entry]
 Type=Application
@@ -101,67 +89,58 @@ Type=Application
 Exec=plank
 Name=Plank
 EOF
-
-  echo "[*] XFCE setup complete. Customize via Settings > Appearance."
-  sleep 2
 }
 
-### MODULE 2: SMB Mount
+### MODULE 2: Mount SMB Share
 function smb_share() {
-  echo "[*] Setting up SMB mount for //BOTFARM/Data/books..."
+  echo "[*] Mounting SMB share..."
   sudo apt install -y cifs-utils
   sudo mkdir -p $SMB_MOUNT
-
-  echo "username=Audiobooks" | sudo tee $SHARE_CREDENTIALS
-  echo "password=1" | sudo tee -a $SHARE_CREDENTIALS
+  echo -e "username=Audiobooks\npassword=1" | sudo tee $SHARE_CREDENTIALS
   sudo chmod 600 $SHARE_CREDENTIALS
 
   sudo mount -t cifs //BOTFARM/Data/books $SMB_MOUNT -o credentials=$SHARE_CREDENTIALS,iocharset=utf8,vers=3.0
-
   if ! grep -q "$SMB_MOUNT" $MOUNT_FILE; then
     echo "//BOTFARM/Data/books $SMB_MOUNT cifs credentials=$SHARE_CREDENTIALS,iocharset=utf8,vers=3.0 0 0" | sudo tee -a $MOUNT_FILE
   fi
 
-  echo "[*] SMB share mounted and persistent."
-  sleep 2
+  sudo chown -R $USER:$USER $SMB_MOUNT
+  sudo chmod -R 755 $SMB_MOUNT
 }
 
-### MODULE 3: FTP Mount
+### MODULE 3: Mount FTP Server
 function ftp_share() {
-  echo "[*] Setting up FTP mount..."
+  echo "[*] Mounting FTP..."
   sudo apt install -y curlftpfs
   sudo mkdir -p $FTP_MOUNT
-
-  echo "seedit4me" | sudo tee $FTP_CREDENTIALS
-  echo "@Kscb1019" | sudo tee -a $FTP_CREDENTIALS
+  echo -e "seedit4me\n@Kscb1019" | sudo tee $FTP_CREDENTIALS
   sudo chmod 600 $FTP_CREDENTIALS
 
-  sudo curlftpfs -o user="$(head -n1 $FTP_CREDENTIALS):$(tail -n1 $FTP_CREDENTIALS)" nl88.seedit4.me:52404 $FTP_MOUNT
-
+  sudo curlftpfs -o user=seedit4me:@Kscb1019 nl88.seedit4.me:52404 $FTP_MOUNT
   if ! grep -q "$FTP_MOUNT" $MOUNT_FILE; then
-    echo "curlftpfs#nl88.seedit4.me:52404 $FTP_MOUNT fuse user=$(head -n1 $FTP_CREDENTIALS):$(tail -n1 $FTP_CREDENTIALS),allow_other 0 0" | sudo tee -a $MOUNT_FILE
+    echo "curlftpfs#nl88.seedit4.me:52404 $FTP_MOUNT fuse user=seedit4me:@Kscb1019,allow_other 0 0" | sudo tee -a $MOUNT_FILE
   fi
 
-  echo "[*] FTP mounted and persistent."
-  sleep 2
+  sudo chown -R $USER:$USER $FTP_MOUNT
+  sudo chmod -R 755 $FTP_MOUNT
 }
 
-### MODULE 4: Docker + Stack
+### MODULE 4: Docker Stack
 function docker_stack() {
-  echo "[*] Installing Docker and Docker Compose..."
+  echo "[*] Installing Docker + Compose..."
   sudo apt install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
   sudo systemctl enable docker
   sudo systemctl start docker
 
-  echo "[*] Launching Portainer..."
   sudo docker volume create portainer_data
   sudo docker run -d --name portainer --restart=always -p 9000:9000 \
     -v /var/run/docker.sock:/var/run/docker.sock -v portainer_data:/data portainer/portainer-ce
 
-  echo "[*] Launching Dashy + Audiobookshelf + FileBrowser..."
-  mkdir -p $DASHY_DIR && cd $DASHY_DIR
+  mkdir -p "$DASHY_DIR"
+  sudo chown -R $USER:$USER $BASE_DIR
+  sudo chmod -R 755 $BASE_DIR
 
-  cat << EOF > docker-compose.yml
+  cat << EOF > $DASHY_DIR/docker-compose.yml
 version: '3.8'
 services:
   dashy:
@@ -181,8 +160,8 @@ services:
       - 13378:80
     volumes:
       - $SMB_MOUNT:/audiobooks
-      - audiobookshelf_config:/config
-      - audiobookshelf_metadata:/metadata
+      - $BASE_DIR/docker/audiobookshelf/config:/config
+      - $BASE_DIR/docker/audiobookshelf/metadata:/metadata
 
   filebrowser:
     image: filebrowser/filebrowser
@@ -191,13 +170,10 @@ services:
     ports:
       - 8081:80
     volumes:
-      - /:/srv
-volumes:
-  audiobookshelf_config:
-  audiobookshelf_metadata:
+      - $BASE_DIR:/srv
 EOF
 
-  cat << EOF > conf.yml
+  cat << EOF > $DASHY_DIR/conf.yml
 appConfig:
   title: "pico-pc Dashboard"
   theme: colorful
@@ -208,35 +184,28 @@ pages:
   - name: Home
     items:
       - title: Portainer
-        description: Docker GUI
         icon: docker
         url: http://localhost:9000
       - title: Audiobookshelf
-        description: Stream your audiobooks
         icon: book
         url: http://localhost:13378
       - title: FileBrowser
-        description: Browse pico-pc
         icon: folder
         url: http://localhost:8081
       - title: pico-pc Stats
-        description: CPU, RAM, and Disk
         icon: cpu
         widget:
           type: system-info
 EOF
 
-  sudo docker compose up -d
-  echo "[*] Docker stack online. Dashy @ :8080, Portainer @ :9000, Audiobookshelf @ :13378, FileBrowser @ :8081"
-  sleep 2
+  cd $DASHY_DIR
+  sudo docker compose -f docker-compose.yml up -d
 }
 
 ### MODULE 5: Tailscale
 function install_tailscale() {
-  echo "[*] Installing Tailscale..."
   sudo apt install -y tailscale
-  echo "[*] Now run: sudo tailscale up (to authenticate via browser)"
-  sleep 2
+  echo "[*] Now run: sudo tailscale up"
 }
 
 ### RUN MENU
