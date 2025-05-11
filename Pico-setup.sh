@@ -15,8 +15,9 @@ DASHY_DIR="$HOME/dashy"
 function main_menu() {
   clear
   echo "=== pico-pc Setup Menu ==="
+  echo "0) Add All Required Repos and Keyrings"
   echo "1) Desktop Glow-Up (XFCE + Themes + Tools)"
-  echo "2) Mount SMB Share (\\BOTFARM\\Data\\books)"
+  echo "2) Mount SMB Share (\\\\BOTFARM\\\\Data\\\\books)"
   echo "3) Mount FTP Server (nl88.seedit4.me)"
   echo "4) Docker Stack (Portainer + Dashy + Audiobookshelf + FileBrowser)"
   echo "5) Install Tailscale"
@@ -25,15 +26,43 @@ function main_menu() {
   echo ""
   read -p "Choose an option: " choice
   case $choice in
+    0) add_repos ;;
     1) glow_up ;;
     2) smb_share ;;
     3) ftp_share ;;
     4) docker_stack ;;
     5) install_tailscale ;;
-    6) glow_up; smb_share; ftp_share; docker_stack; install_tailscale ;;
+    6) add_repos; glow_up; smb_share; ftp_share; docker_stack; install_tailscale ;;
     7) exit 0 ;;
     *) echo "Invalid option"; sleep 1; main_menu ;;
   esac
+}
+
+### MODULE 0: Add Repos & Keyrings
+function add_repos() {
+  echo "[*] Enabling required APT sources..."
+  sudo apt update
+  sudo apt install -y software-properties-common apt-transport-https ca-certificates curl gnupg lsb-release fuse
+
+  echo "[*] Enabling 'universe' repo..."
+  sudo add-apt-repository universe -y
+
+  echo "[*] Adding Docker repo..."
+  sudo install -m 0755 -d /etc/apt/keyrings
+  curl -fsSL https://download.docker.com/linux/debian/gpg | sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+  echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] \
+  https://download.docker.com/linux/debian $(lsb_release -cs) stable" | \
+  sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+
+  echo "[*] Adding Tailscale repo..."
+  curl -fsSL https://pkgs.tailscale.com/stable/ubuntu/jammy.noarmor.gpg | sudo gpg --dearmor -o /usr/share/keyrings/tailscale-archive-keyring.gpg
+  echo "deb [signed-by=/usr/share/keyrings/tailscale-archive-keyring.gpg] https://pkgs.tailscale.com/stable/ubuntu jammy main" | \
+  sudo tee /etc/apt/sources.list.d/tailscale.list
+
+  echo "[*] Updating package list..."
+  sudo apt update
+  echo "[✓] All repos and keyrings installed."
+  sleep 2
 }
 
 ### MODULE 1: XFCE + Customizations
@@ -44,7 +73,6 @@ function glow_up() {
   sudo systemctl enable lightdm
   mkdir -p ~/.config/autostart
 
-  # Autostart Picom and Plank
   cat << EOF > ~/.config/autostart/picom.desktop
 [Desktop Entry]
 Type=Application
@@ -106,18 +134,14 @@ function ftp_share() {
 ### MODULE 4: Docker + Stack
 function docker_stack() {
   echo "[*] Installing Docker and Docker Compose..."
-  sudo apt install -y ca-certificates curl gnupg lsb-release
-  sudo mkdir -m 0755 -p /etc/apt/keyrings
-  curl -fsSL https://download.docker.com/linux/debian/gpg | sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg
-  echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/debian $(lsb_release -cs) stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
-  sudo apt update
   sudo apt install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
   sudo systemctl enable docker
   sudo systemctl start docker
 
   echo "[*] Launching Portainer..."
   sudo docker volume create portainer_data
-  sudo docker run -d --name portainer --restart=always -p 9000:9000 -v /var/run/docker.sock:/var/run/docker.sock -v portainer_data:/data portainer/portainer-ce
+  sudo docker run -d --name portainer --restart=always -p 9000:9000 \
+    -v /var/run/docker.sock:/var/run/docker.sock -v portainer_data:/data portainer/portainer-ce
 
   echo "[*] Launching Dashy + Audiobookshelf + FileBrowser..."
   mkdir -p $DASHY_DIR && cd $DASHY_DIR
@@ -177,7 +201,7 @@ pages:
         icon: book
         url: http://localhost:13378
       - title: FileBrowser
-        description: Browse files on pico-pc
+        description: Browse pico-pc
         icon: folder
         url: http://localhost:8081
       - title: pico-pc Stats
@@ -195,7 +219,7 @@ EOF
 ### MODULE 5: Tailscale
 function install_tailscale() {
   echo "[*] Installing Tailscale..."
-  curl -fsSL https://tailscale.com/install.sh | sh
+  sudo apt install -y tailscale
   echo "[*] Now run: sudo tailscale up (to authenticate via browser)"
   sleep 2
 }
