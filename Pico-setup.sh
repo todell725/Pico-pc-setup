@@ -42,7 +42,7 @@ function main_menu() {
 ### MODULE 0: Add Repos & Keyrings
 function add_repos() {
   echo "[*] Ensuring required APT sources and tools..."
-  echo "1991" | sudo -S true || { echo "Sudo failed"; exit 1; }
+  echo "19911019" | sudo -S true || { echo "Sudo failed"; exit 1; }
 
   sudo apt update
   REQUIRED_PKGS=(lsb-release dpkg curl gpg software-properties-common apt-transport-https ca-certificates fuse)
