@@ -57,7 +57,7 @@ function add_repos() {
   echo "[*] Enabling universe repo..."
   sudo add-apt-repository universe -y
 
-  echo "[*] Adding Docker repo for Ubuntu..."
+  echo "[*] Adding Docker repo..."
   sudo install -m 0755 -d /etc/apt/keyrings
   curl -fsSL https://download.docker.com/linux/ubuntu/gpg | \
     sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg
@@ -75,18 +75,17 @@ function add_repos() {
 
   sudo apt update
 
-  echo "[*] Creating central directory structure..."
+  echo "[*] Creating directory structure..."
   sudo mkdir -p "$SMB_MOUNT" "$FTP_MOUNT" "$DASHY_DIR"
-  sudo chown -R $USER:$USER "$BASE_DIR"
   sudo chmod -R 755 "$BASE_DIR"
 
   echo "[✓] Base prep complete."
 }
 
-### MODULE 1: XFCE Desktop + Enhancements
+### MODULE 1: XFCE + Enhancements
 function glow_up() {
   echo "[*] Installing XFCE desktop + extras..."
-  sudo apt install -y xfce4 lightdm arc-theme papirus-icon-theme fonts-ubuntu thunar epiphany-browser plank picom xrdp
+  sudo apt install -y xfce4 lightdm arc-theme papirus-icon-theme fonts-ubuntu thunar firefox plank picom xrdp
   sudo systemctl enable lightdm
 
   mkdir -p ~/.config/autostart
@@ -105,23 +104,20 @@ Name=Plank
 EOF
 }
 
-### MODULE 2: Mount SMB Share
+### MODULE 2: SMB Share
 function smb_share() {
   echo "[*] Mounting SMB share..."
   sudo mkdir -p "$SMB_MOUNT"
   echo -e "username=Audiobooks\npassword=1" | sudo tee "$SHARE_CREDENTIALS"
   sudo chmod 600 "$SHARE_CREDENTIALS"
 
-  sudo mount -t cifs //BOTFARM/Data/books "$SMB_MOUNT" -o credentials="$SHARE_CREDENTIALS",iocharset=utf8,vers=3.0
+  sudo mount -t cifs //192.168.68.116/Data/books "$SMB_MOUNT" -o credentials="$SHARE_CREDENTIALS",iocharset=utf8,vers=3.0
   if ! grep -q "$SMB_MOUNT" "$MOUNT_FILE"; then
-    echo "//BOTFARM/Data/books $SMB_MOUNT cifs credentials=$SHARE_CREDENTIALS,iocharset=utf8,vers=3.0 0 0" | sudo tee -a "$MOUNT_FILE"
+    echo "//192.168.68.116/Data/books $SMB_MOUNT cifs credentials=$SHARE_CREDENTIALS,iocharset=utf8,vers=3.0 0 0" | sudo tee -a "$MOUNT_FILE"
   fi
-
-  sudo chown -R $USER:$USER "$SMB_MOUNT"
-  sudo chmod -R 755 "$SMB_MOUNT"
 }
 
-### MODULE 3: Mount FTP Share
+### MODULE 3: FTP Share
 function ftp_share() {
   echo "[*] Mounting FTP..."
   sudo mkdir -p "$FTP_MOUNT"
@@ -132,9 +128,6 @@ function ftp_share() {
   if ! grep -q "$FTP_MOUNT" "$MOUNT_FILE"; then
     echo "curlftpfs#nl88.seedit4.me:52404 $FTP_MOUNT fuse user=seedit4me:@Kscb1019,allow_other 0 0" | sudo tee -a "$MOUNT_FILE"
   fi
-
-  sudo chown -R $USER:$USER "$FTP_MOUNT"
-  sudo chmod -R 755 "$FTP_MOUNT"
 }
 
 ### MODULE 4: Docker Stack
@@ -221,5 +214,5 @@ function install_tailscale() {
   echo "[!] Run 'sudo tailscale up' to authenticate via browser."
 }
 
-### RUN
+### START
 main_menu
