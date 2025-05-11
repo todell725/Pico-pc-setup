@@ -86,7 +86,7 @@ function add_repos() {
 ### MODULE 1: XFCE Desktop + Enhancements
 function glow_up() {
   echo "[*] Installing XFCE desktop + extras..."
-  sudo apt install -y xfce4 lightdm arc-theme papirus-icon-theme fonts-ubuntu thunar midori plank picom xrdp
+  sudo apt install -y xfce4 lightdm arc-theme papirus-icon-theme fonts-ubuntu thunar epiphany-browser plank picom xrdp
   sudo systemctl enable lightdm
 
   mkdir -p ~/.config/autostart
