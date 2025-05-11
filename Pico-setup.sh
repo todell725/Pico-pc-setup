@@ -38,11 +38,28 @@ function main_menu() {
   esac
 }
 
-### MODULE 0: Add Repos & Keyrings
+### MODULE 0: Add Repos & Keyrings + Base Tools
 function add_repos() {
-  echo "[*] Enabling required APT sources..."
+  echo "[*] Checking sudo/root privileges..."
+  if [[ $EUID -ne 0 ]]; then
+    echo "[!] This script must be run with sudo privileges."
+    echo "    Re-running with sudo using default root password..."
+    echo "1991" | sudo -S true || { echo "Invalid sudo password or user not in sudoers group."; exit 1; }
+  fi
+
+  echo "[*] Ensuring required base packages exist..."
   sudo apt update
-  sudo apt install -y software-properties-common apt-transport-https ca-certificates curl gnupg lsb-release fuse
+
+  REQUIRED_PKGS=(lsb-release dpkg curl gpg software-properties-common apt-transport-https ca-certificates fuse)
+
+  for pkg in "${REQUIRED_PKGS[@]}"; do
+    if ! dpkg -s "$pkg" >/dev/null 2>&1; then
+      echo "[+] Installing missing package: $pkg"
+      sudo apt install -y "$pkg"
+    else
+      echo "[✓] $pkg is already installed."
+    fi
+  done
 
   echo "[*] Enabling 'universe' repo..."
   sudo add-apt-repository universe -y
@@ -50,18 +67,16 @@ function add_repos() {
   echo "[*] Adding Docker repo..."
   sudo install -m 0755 -d /etc/apt/keyrings
   curl -fsSL https://download.docker.com/linux/debian/gpg | sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg
-  echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] \
-  https://download.docker.com/linux/debian $(lsb_release -cs) stable" | \
-  sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+  echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/debian $(lsb_release -cs) stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
 
   echo "[*] Adding Tailscale repo..."
   curl -fsSL https://pkgs.tailscale.com/stable/ubuntu/jammy.noarmor.gpg | sudo gpg --dearmor -o /usr/share/keyrings/tailscale-archive-keyring.gpg
-  echo "deb [signed-by=/usr/share/keyrings/tailscale-archive-keyring.gpg] https://pkgs.tailscale.com/stable/ubuntu jammy main" | \
-  sudo tee /etc/apt/sources.list.d/tailscale.list
+  echo "deb [signed-by=/usr/share/keyrings/tailscale-archive-keyring.gpg] https://pkgs.tailscale.com/stable/ubuntu jammy main" | sudo tee /etc/apt/sources.list.d/tailscale.list
 
-  echo "[*] Updating package list..."
+  echo "[*] Updating package list again..."
   sudo apt update
-  echo "[✓] All repos and keyrings installed."
+
+  echo "[✓] All required repos, tools, and keyrings installed."
   sleep 2
 }
 
