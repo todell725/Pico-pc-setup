@@ -111,9 +111,9 @@ function smb_share() {
   echo -e "username=Audiobooks\npassword=1" | sudo tee "$SHARE_CREDENTIALS"
   sudo chmod 600 "$SHARE_CREDENTIALS"
 
-  sudo mount -t cifs //192.168.68.116/Data/books "$SMB_MOUNT" -o credentials="$SHARE_CREDENTIALS",iocharset=utf8,vers=3.0
+  sudo mount -t cifs //192.168.68.121/Data/books "$SMB_MOUNT" -o credentials="$SHARE_CREDENTIALS",iocharset=utf8,vers=3.0
   if ! grep -q "$SMB_MOUNT" "$MOUNT_FILE"; then
-    echo "//192.168.68.116/Data/books $SMB_MOUNT cifs credentials=$SHARE_CREDENTIALS,iocharset=utf8,vers=3.0 0 0" | sudo tee -a "$MOUNT_FILE"
+    echo "//192.168.68.1121/Data/books $SMB_MOUNT cifs credentials=$SHARE_CREDENTIALS,iocharset=utf8,vers=3.0 0 0" | sudo tee -a "$MOUNT_FILE"
   fi
 }
 
