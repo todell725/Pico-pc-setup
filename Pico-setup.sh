@@ -14,7 +14,7 @@ DASHY_DIR="$BASE_DIR/docker/dashy"
 ### MENU
 function main_menu() {
   clear
-  echo "=== pico-setup (ARM64, Sweet Potato) ==="
+  echo "=== Pico-Setup (ARM64 – Sweet Potato) ==="
   echo "0) Prepare Repos & Permissions"
   echo "1) Desktop Glow-Up (XFCE + Tools)"
   echo "2) Mount SMB Share"
@@ -26,16 +26,22 @@ function main_menu() {
   echo ""
   read -rp "Choose an option: " choice
   case $choice in
-    0) add_repos ;;
-    1) glow_up ;;
-    2) smb_share ;;
-    3) ftp_share ;;
-    4) docker_stack ;;
-    5) install_tailscale ;;
-    6) add_repos; glow_up; smb_share; ftp_share; docker_stack; install_tailscale ;;
+    0) add_repos; pause_and_return ;;
+    1) glow_up; pause_and_return ;;
+    2) smb_share; pause_and_return ;;
+    3) ftp_share; pause_and_return ;;
+    4) docker_stack; pause_and_return ;;
+    5) install_tailscale; pause_and_return ;;
+    6) add_repos; glow_up; smb_share; ftp_share; docker_stack; install_tailscale; pause_and_return ;;
     7) exit 0 ;;
     *) echo "Invalid option"; sleep 1; main_menu ;;
   esac
+}
+
+function pause_and_return() {
+  echo ""
+  read -rp "Press Enter to return to the menu..." _
+  main_menu
 }
 
 ### MODULE 0: Repos & Permissions
@@ -67,9 +73,6 @@ function add_repos() {
     "deb [signed-by=/usr/share/keyrings/tailscale-archive-keyring.gpg] https://pkgs.tailscale.com/stable/ubuntu jammy main" | \
     sudo tee /etc/apt/sources.list.d/tailscale.list
 
-  echo "[*] Cleaning any broken Libre Computer repos..."
-  sudo rm -f /etc/apt/sources.list.d/libre-computer*
-
   sudo apt update
 
   echo "[*] Creating central directory structure..."
@@ -77,8 +80,7 @@ function add_repos() {
   sudo chown -R $USER:$USER "$BASE_DIR"
   sudo chmod -R 755 "$BASE_DIR"
 
-  echo "[✓] Repo prep and permissions complete."
-  sleep 2
+  echo "[✓] Base prep complete."
 }
 
 ### MODULE 1: XFCE Desktop + Enhancements
@@ -219,5 +221,5 @@ function install_tailscale() {
   echo "[!] Run 'sudo tailscale up' to authenticate via browser."
 }
 
-### RUN MENU
+### RUN
 main_menu
