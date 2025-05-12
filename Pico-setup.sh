@@ -110,15 +110,26 @@ sudo netplan apply
 function smb_share() {
   echo -e "username=$SMB_USER\npassword=$SMB_PASS" | sudo tee "$SHARE_CREDENTIALS"
   sudo chmod 600 "$SHARE_CREDENTIALS"
-  sudo mount -t cifs //$SMB_HOST/Data/books "$SMB_MOUNT" -o credentials="$SHARE_CREDENTIALS",iocharset=utf8,vers=3.0,_netdev,nofail || echo "[!] SMB mount failed"
-grep -q "$SMB_MOUNT" /etc/fstab || echo "//$SMB_HOST/Data/books $SMB_MOUNT cifs credentials=$SHARE_CREDENTIALS,iocharset=utf8,vers=3.0,_netdev,nofail 0 0" | sudo tee -a /etc/fstab
+
+  sudo mount -t cifs "//$SMB_HOST/Data/books" "$SMB_MOUNT" \
+    -o credentials="$SHARE_CREDENTIALS",iocharset=utf8,vers=3.0,_netdev,nofail || \
+    echo "[!] SMB mount failed"
+
+  grep -q "$SMB_MOUNT" /etc/fstab || \
+    echo "//$SMB_HOST/Data/books $SMB_MOUNT cifs credentials=$SHARE_CREDENTIALS,iocharset=utf8,vers=3.0,_netdev,nofail 0 0" | \
+    sudo tee -a /etc/fstab
 }
 
 function ftp_share() {
   echo -e "$FTP_USER\n$FTP_PASS" | sudo tee "$FTP_CREDENTIALS"
   sudo chmod 600 "$FTP_CREDENTIALS"
-sudo curlftpfs -o "user=${FTP_USER}:${FTP_PASS},_netdev,nofail" "$FTP_HOST" "$FTP_MOUNT" || echo "[!] FTP mount failed"
-grep -q "$FTP_MOUNT" /etc/fstab || echo "curlftpfs#$FTP_HOST $FTP_MOUNT fuse user=$FTP_USER:$FTP_PASS,_netdev,nofail 0 0" | sudo tee -a /etc/fstab
+
+  sudo curlftpfs -o "user=${FTP_USER}:${FTP_PASS},_netdev,nofail" \
+    "$FTP_HOST" "$FTP_MOUNT" || echo "[!] FTP mount failed"
+
+  grep -q "$FTP_MOUNT" /etc/fstab || \
+    echo "curlftpfs#$FTP_HOST $FTP_MOUNT fuse user=$FTP_USER:$FTP_PASS,_netdev,nofail 0 0" | \
+    sudo tee -a /etc/fstab
 }
 
 function docker_stack() {
