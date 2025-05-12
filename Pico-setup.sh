@@ -34,41 +34,47 @@ mkdir -p "$SMB_MOUNT" "$FTP_MOUNT" "$DASHY_DIR" /opt/books-writeable /opt/books-
 
 # === Menu ===
 function main_menu() {
-  clear
-  echo "=== Pico Setup Launcher ==="
-  echo "0) Prepare Repos & Network"
-  echo "1) Desktop Glow-Up"
-  echo "2) Mount SMB Share"
-  echo "3) Mount FTP Share"
-  echo "4) Docker Stack"
-  echo "5) Install Tailscale"
-  echo "6) Utilities / Performance Tools"
-  echo "7) Create Audiobookshelf Symlinks"
-  echo "8) Run ALL"
-  echo "9) Exit"
-  echo ""
-  read -rp "Choose an option: " choice
-  case $choice in
-    0) add_repos ;;
-    1) glow_up ;;
-    2) smb_share ;;
-    3) ftp_share ;;
-    4) docker_stack ;;
-    5) install_tailscale ;;
-    6) utilities_menu ;;
-    7) symlink_creation ;;
-    8) add_repos; glow_up; smb_share; ftp_share; docker_stack; install_tailscale; symlink_creation ;;
-    9) exit 0 ;;
-    *) echo "Invalid option"; sleep 1 ;;
-  esac
-  read -rp "Press Enter to return to the menu..." _
-  main_menu
+  while true; do
+    clear
+    echo "=== Pico Setup Launcher ==="
+    echo "0) Prepare Repos & Network"
+    echo "1) Desktop Glow-Up"
+    echo "2) Mount SMB Share"
+    echo "3) Mount FTP Share"
+    echo "4) Docker Stack"
+    echo "5) Install Tailscale"
+    echo "6) Utilities / Performance Tools"
+    echo "7) Create Audiobookshelf Symlinks"
+    echo "8) Run ALL"
+    echo "9) Exit"
+    echo ""
+    read -rp "Choose an option: " choice
+    case $choice in
+      0) add_repos ;;
+      1) glow_up ;;
+      2) smb_share ;;
+      3) ftp_share ;;
+      4) docker_stack ;;
+      5) install_tailscale ;;
+      6) utilities_menu ;;
+      7) symlink_creation ;;
+      8) add_repos; glow_up; smb_share; ftp_share; docker_stack; install_tailscale; symlink_creation ;;
+      9) exit 0 ;;
+      *) echo "Invalid option"; sleep 1 ;;
+    esac
+    read -rp "Press Enter to return to the menu..." _
+  done
 }
+
 
 function add_repos() {
   echo "[*] Preparing system..."
   echo "root:#insert_password_here#" | sudo chpasswd
   iface=$(ip -o link show | awk -F': ' '/state UP/ && $2 != "lo" {print $2; exit}')
+  if [[ -z "$iface" ]]; then
+    echo "[!] No active network interface found. Aborting."
+    exit 1
+  fi
   sudo rm -f /etc/netplan/*.yaml
   cat << EOF | sudo tee /etc/netplan/01-network-manager.yaml
 network:
@@ -81,7 +87,7 @@ EOF
   sudo netplan apply
   sudo touch /etc/cloud/cloud-init.disabled
   sudo apt update
-  sudo apt install -y software-properties-common apt-transport-https ca-certificates curl gnupg lsb-release fuse cifs-utils curlftpfs
+  sudo apt install -y software-properties-common apt-transport-https ca-certificates curl gnupg lsb-release fuse cifs-utils curlftpfs openssh-server lm-sensors htop
   sudo install -m 0755 -d /etc/apt/keyrings
   curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg
   echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" | sudo tee /etc/apt/sources.list.d/docker.list
@@ -108,7 +114,7 @@ function smb_share() {
 function ftp_share() {
   echo -e "$FTP_USER\n$FTP_PASS" | sudo tee "$FTP_CREDENTIALS"
   sudo chmod 600 "$FTP_CREDENTIALS"
-  sudo curlftpfs -o user=$FTP_USER:$FTP_PASS,_netdev,nofail #insert_ftp_host# "$FTP_MOUNT" || echo "[!] FTP mount failed"
+sudo curlftpfs -o "user=${FTP_USER}:${FTP_PASS},_netdev,nofail" #insert_ftp_host# "$FTP_MOUNT" || echo "[!] FTP mount failed"
   grep -q "$FTP_MOUNT" /etc/fstab || echo "curlftpfs##insert_ftp_host# $FTP_MOUNT fuse user=$FTP_USER:$FTP_PASS,_netdev,nofail 0 0" | sudo tee -a /etc/fstab
 }
 
