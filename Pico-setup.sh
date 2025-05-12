@@ -75,16 +75,6 @@ function add_repos() {
     echo "[!] No active network interface found. Aborting."
     exit 1
   fi
-  sudo rm -f /etc/netplan/*.yaml
-  cat << EOF | sudo tee /etc/netplan/01-network-manager.yaml
-network:
-  version: 2
-  renderer: NetworkManager
-  ethernets:
-    $iface:
-      dhcp4: true
-EOF
-  sudo netplan apply
   sudo touch /etc/cloud/cloud-init.disabled
   sudo apt update
   sudo apt install -y software-properties-common apt-transport-https ca-certificates curl gnupg lsb-release fuse cifs-utils curlftpfs openssh-server lm-sensors htop
@@ -99,6 +89,17 @@ EOF
 function glow_up() {
   sudo apt install -y xfce4 lightdm arc-theme papirus-icon-theme fonts-ubuntu thunar firefox plank picom xrdp
   sudo systemctl enable lightdm
+  sudo rm -f /etc/netplan/*.yaml
+cat << EOF | sudo tee /etc/netplan/01-network-manager.yaml
+network:
+  version: 2
+  renderer: NetworkManager
+  ethernets:
+    $iface:
+      dhcp4: true
+EOF
+sudo chmod 600 /etc/netplan/01-network-manager.yaml
+sudo netplan apply
   mkdir -p ~/.config/autostart
   echo -e "[Desktop Entry]\nType=Application\nExec=picom --config /dev/null\nName=Picom" > ~/.config/autostart/picom.desktop
   echo -e "[Desktop Entry]\nType=Application\nExec=plank\nName=Plank" > ~/.config/autostart/plank.desktop
